@@ -1,0 +1,22 @@
+# Maven build output
+target/
+*.class
+
+# Rust build output (but NOT Cargo.lock — always commit the lock file)
+host/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Generated key material — never commit keys
+*.pub
+*.sig
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
