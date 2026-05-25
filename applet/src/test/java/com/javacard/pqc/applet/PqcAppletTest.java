@@ -6,6 +6,9 @@ import javacard.framework.AID;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
 
+import org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters;
+import org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters;
+import org.bouncycastle.pqc.crypto.mldsa.MLDSASigner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -107,5 +110,63 @@ class PqcAppletTest {
 
         assertEquals(0x9000, response.getSW());
         assertEquals(1312, total);
+    }
+
+    private byte[] collectChunked(ResponseAPDU first, int maxSize) {
+        byte[] buf = new byte[maxSize];
+        int total = 0;
+        ResponseAPDU response = first;
+        byte[] chunk = response.getData();
+        System.arraycopy(chunk, 0, buf, total, chunk.length);
+        total += chunk.length;
+        while ((response.getSW() & 0xFF00) == 0x6100) {
+            response = simulator.transmitCommand(
+                    new CommandAPDU(CLA, PqcApplet.INS_GET_RESPONSE, 0x00, 0x00, 256));
+            chunk = response.getData();
+            System.arraycopy(chunk, 0, buf, total, chunk.length);
+            total += chunk.length;
+        }
+        assertEquals(0x9000, response.getSW());
+        byte[] result = new byte[total];
+        System.arraycopy(buf, 0, result, 0, total);
+        return result;
+    }
+
+    @Test
+    void signWithWrongLengthShouldReturn6700() {
+        byte[] shortDigest = new byte[16];
+        CommandAPDU sign = new CommandAPDU(CLA, PqcApplet.INS_SIGN, 0x00, 0x00, shortDigest, 0, shortDigest.length,
+                256);
+        ResponseAPDU response = simulator.transmitCommand(sign);
+        assertEquals(0x6700, response.getSW());
+    }
+
+    @Test
+    void signShouldReturnSignatureOf2420Bytes() {
+        byte[] digest = new byte[32];
+        ResponseAPDU first = simulator.transmitCommand(
+                new CommandAPDU(CLA, PqcApplet.INS_SIGN, 0x00, 0x00, digest, 0, digest.length, 256));
+        byte[] signature = collectChunked(first, 2420);
+        assertEquals(2420, signature.length);
+    }
+
+    @Test
+    void signatureShouldVerifyAgainstPubKey() throws Exception {
+        byte[] pubKeyBytes = collectChunked(
+                simulator.transmitCommand(new CommandAPDU(CLA, PqcApplet.INS_GET_PUBKEY, 0x00, 0x00, 256)),
+                1312);
+
+        byte[] digest = hexToBytes(ABC_SHA3_256_OUTPUT);
+        byte[] signature = collectChunked(
+                simulator.transmitCommand(
+                        new CommandAPDU(CLA, PqcApplet.INS_SIGN, 0x00, 0x00, digest, 0, digest.length, 256)),
+                2420);
+
+        MLDSAPublicKeyParameters pubKeyParams = new MLDSAPublicKeyParameters(
+                MLDSAParameters.ml_dsa_44, pubKeyBytes);
+        MLDSASigner verifier = new MLDSASigner();
+        verifier.init(false, pubKeyParams);
+        verifier.update(digest, 0, digest.length);
+        assertTrue(verifier.verifySignature(signature), "Signature must verify against public key");
     }
 }

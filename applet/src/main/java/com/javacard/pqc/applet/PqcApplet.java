@@ -26,14 +26,15 @@ public class PqcApplet extends Applet {
     private short outLength;
 
     private final byte[] publicKey;
-    private final byte[] privateKey;
+    private final Signer signer;
 
     private static final short HASH_BUFFER_SIZE = 32;
-    private static final short OUT_BUFFER_SIZE = 1312;
+    private static final short OUT_BUFFER_SIZE = 2420;
 
     public static final byte INS_ECHO = 0x10;
     public static final byte INS_HASH = 0x20;
     public static final byte INS_GET_PUBKEY = 0x30;
+    public static final byte INS_SIGN = 0x40;
     public static final byte INS_GET_RESPONSE = (byte) 0xC0;
 
     private PqcApplet() {
@@ -46,7 +47,7 @@ public class PqcApplet extends Applet {
         AsymmetricCipherKeyPair pair = generator.generateKeyPair();
 
         publicKey = ((MLDSAPublicKeyParameters) pair.getPublic()).getEncoded();
-        privateKey = ((MLDSAPrivateKeyParameters) pair.getPrivate()).getEncoded();
+        signer = new MlDsaSigner((MLDSAPrivateKeyParameters) pair.getPrivate());
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -67,6 +68,9 @@ public class PqcApplet extends Applet {
                 break;
             case INS_GET_PUBKEY:
                 getPubKey(apdu);
+                break;
+            case INS_SIGN:
+                sign(apdu);
                 break;
             case INS_GET_RESPONSE:
                 getResponse(apdu);
@@ -95,6 +99,16 @@ public class PqcApplet extends Applet {
         Util.arrayCopyNonAtomic(publicKey, (short) 0, outBuffer, (short) 0, (short) publicKey.length);
         outOffset = 0;
         outLength = (short) publicKey.length;
+        sendChunk(apdu);
+    }
+
+    private void sign(APDU apdu) {
+        short len = apdu.setIncomingAndReceive();
+        if (len != HASH_BUFFER_SIZE) {
+            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        }
+        outLength = signer.sign(apdu.getBuffer(), ISO7816.OFFSET_CDATA, len, outBuffer, (short) 0);
+        outOffset = 0;
         sendChunk(apdu);
     }
 
