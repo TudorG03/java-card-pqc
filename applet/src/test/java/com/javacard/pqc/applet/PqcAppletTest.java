@@ -85,4 +85,27 @@ class PqcAppletTest {
         assertEquals(0x9000, response.getSW());
         assertArrayEquals(hexToBytes(ABC_SHA3_256_OUTPUT), response.getData());
     }
+
+    @Test
+    void getPubKeyShouldReturnSuccessAndCorrectSize() {
+        byte[] accumulated = new byte[1312];
+        int total = 0;
+
+        ResponseAPDU response = simulator.transmitCommand(
+                new CommandAPDU(CLA, PqcApplet.INS_GET_PUBKEY, 0x00, 0x00, 256));
+        byte[] chunk = response.getData();
+        System.arraycopy(chunk, 0, accumulated, total, chunk.length);
+        total += chunk.length;
+
+        while ((response.getSW() & 0xFF00) == 0x6100) {
+            response = simulator.transmitCommand(
+                    new CommandAPDU(CLA, PqcApplet.INS_GET_RESPONSE, 0x00, 0x00, 256));
+            chunk = response.getData();
+            System.arraycopy(chunk, 0, accumulated, total, chunk.length);
+            total += chunk.length;
+        }
+
+        assertEquals(0x9000, response.getSW());
+        assertEquals(1312, total);
+    }
 }
