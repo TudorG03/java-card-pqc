@@ -15,3 +15,4 @@ ml-dsa = "=0.1.0"
 
 [dev-dependencies]
 # integration tests connect to a running simulator instance
+hex = "=0.4.3"

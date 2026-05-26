@@ -1,6 +1,7 @@
 mod hasher;
 mod signer;
 mod transport;
+mod verifier;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -19,6 +20,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Sign { file: PathBuf },
+    Verify { file: PathBuf },
 }
 
 fn main() -> Result<()> {
@@ -37,7 +39,30 @@ fn main() -> Result<()> {
 
             let sig_path = file.with_extension("sig");
             std::fs::write(&sig_path, &signature)?;
-            println!("Signature ({} bytes) written to {}", signature.len(), sig_path.display());
+            println!(
+                "Signature ({} bytes) written to {}",
+                signature.len(),
+                sig_path.display()
+            );
+        }
+        Commands::Verify { file } => {
+            let digest = hasher::hash_file(&file)?;
+            let sig_path = file.with_extension("sig");
+            let signature = std::fs::read(&sig_path)?;
+
+            let mut transport = transport::CardTransport::connect(SIMULATOR_ADDR)?;
+            transport.select(AID)?;
+            println!("Applet selected");
+
+            let pub_key = verifier::get_pubkey(&mut transport)?;
+            let valid = verifier::verify_signature(&pub_key, &digest, &signature)?;
+
+            if valid {
+                println!("Signature is VALID!");
+            } else {
+                println!("Signature is INVALID!");
+                std::process::exit(1);
+            }
         }
     }
 
