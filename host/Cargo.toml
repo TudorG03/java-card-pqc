@@ -11,6 +11,7 @@ path = "src/main.rs"
 sha3 = "=0.10.8"
 anyhow = "=1.0.98"
 clap = { version = "=4.5.37", features = ["derive"] }
+ml-dsa = "=0.1.0"
 
 [dev-dependencies]
 # integration tests connect to a running simulator instance
