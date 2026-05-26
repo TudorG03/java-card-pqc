@@ -18,9 +18,14 @@ pub fn verify_signature(pubkey: &[u8], digest: &[u8; 32], sig: &[u8]) -> Result<
     let enc_vk = EncodedVerifyingKey::<MlDsa44>::try_from(pubkey)?;
     let vk = VerifyingKey::<MlDsa44>::decode(&enc_vk);
 
-    let enc_sig = EncodedSignature::<MlDsa44>::try_from(sig)?;
-    let signature = Signature::<MlDsa44>::decode(&enc_sig)
-        .ok_or_else(|| anyhow::anyhow!("Invalid signature"))?;
+    let enc_sig = match EncodedSignature::<MlDsa44>::try_from(sig) {
+        Ok(e) => e,
+        Err(_) => return Ok(false),
+    };
+    let signature = match Signature::<MlDsa44>::decode(&enc_sig) {
+        Some(s) => s,
+        None => return Ok(false),
+    };
 
     Ok(vk.verify(digest, &signature).is_ok())
 }
