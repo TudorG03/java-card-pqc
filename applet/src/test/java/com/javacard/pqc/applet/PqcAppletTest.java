@@ -1,29 +1,31 @@
 package com.javacard.pqc.applet;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.licel.jcardsim.smartcardio.CardSimulator;
 import com.licel.jcardsim.utils.AIDUtil;
 import javacard.framework.AID;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
-
 import org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters;
 import org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters;
 import org.bouncycastle.pqc.crypto.mldsa.MLDSASigner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 class PqcAppletTest {
 
     private CardSimulator simulator;
 
-    private final static int CLA = 0x00;
+    private static final int CLA = 0x00;
 
-    private final static int INS_SELECT = 0xA4;
+    private static final int INS_SELECT = 0xA4;
 
-    private final static String EMPTY_SHA3_256_OUTPUT = "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a";
+    private static final String EMPTY_SHA3_256_OUTPUT =
+        "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a";
 
-    private final static String ABC_SHA3_256_OUTPUT = "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532";
+    private static final String ABC_SHA3_256_OUTPUT =
+        "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532";
 
     private CardSimulator buildSimulator() {
         CardSimulator simulator = new CardSimulator();
@@ -35,8 +37,9 @@ class PqcAppletTest {
     @BeforeEach
     void setupSimulator() {
         simulator = buildSimulator();
-        simulator
-                .transmitCommand(new CommandAPDU(CLA, INS_SELECT, 0x04, 0x00, PqcApplet.AID_BYTES));
+        simulator.transmitCommand(
+            new CommandAPDU(CLA, INS_SELECT, 0x04, 0x00, PqcApplet.AID_BYTES)
+        );
     }
 
     private byte[] hexToBytes(String hex) {
@@ -51,7 +54,13 @@ class PqcAppletTest {
     @Test
     void selectShouldReturnSuccess() {
         CardSimulator simulator = buildSimulator();
-        CommandAPDU select = new CommandAPDU(CLA, INS_SELECT, 0x04, 0x00, PqcApplet.AID_BYTES);
+        CommandAPDU select = new CommandAPDU(
+            CLA,
+            INS_SELECT,
+            0x04,
+            0x00,
+            PqcApplet.AID_BYTES
+        );
         ResponseAPDU response = simulator.transmitCommand(select);
         assertEquals(0x9000, response.getSW(), "SELECT must return 9000");
     }
@@ -66,7 +75,13 @@ class PqcAppletTest {
     @Test
     void echoShouldReturnSuccessAndSameBytes() {
         byte[] payload = { 0x01, 0x02, 0x03 };
-        CommandAPDU echo = new CommandAPDU(CLA, PqcApplet.INS_ECHO, 0x00, 0x00, payload);
+        CommandAPDU echo = new CommandAPDU(
+            CLA,
+            PqcApplet.INS_ECHO,
+            0x00,
+            0x00,
+            payload
+        );
         ResponseAPDU response = simulator.transmitCommand(echo);
         assertEquals(0x9000, response.getSW());
         assertArrayEquals(payload, response.getData());
@@ -74,16 +89,30 @@ class PqcAppletTest {
 
     @Test
     void hashOfEmptyInputReturnSuccessAndMatchesNistVector() {
-        CommandAPDU emptyHash = new CommandAPDU(CLA, PqcApplet.INS_HASH, 0x00, 0x00);
+        CommandAPDU emptyHash = new CommandAPDU(
+            CLA,
+            PqcApplet.INS_HASH,
+            0x00,
+            0x00
+        );
         ResponseAPDU response = simulator.transmitCommand(emptyHash);
         assertEquals(0x9000, response.getSW());
-        assertArrayEquals(hexToBytes(EMPTY_SHA3_256_OUTPUT), response.getData());
+        assertArrayEquals(
+            hexToBytes(EMPTY_SHA3_256_OUTPUT),
+            response.getData()
+        );
     }
 
     @Test
     void hashOfAbcReturnSuccessAndMatchesNistVector() {
         byte[] payload = { 0x61, 0x62, 0x63 };
-        CommandAPDU abcHash = new CommandAPDU(CLA, PqcApplet.INS_HASH, 0x00, 0x00, payload);
+        CommandAPDU abcHash = new CommandAPDU(
+            CLA,
+            PqcApplet.INS_HASH,
+            0x00,
+            0x00,
+            payload
+        );
         ResponseAPDU response = simulator.transmitCommand(abcHash);
         assertEquals(0x9000, response.getSW());
         assertArrayEquals(hexToBytes(ABC_SHA3_256_OUTPUT), response.getData());
@@ -95,14 +124,22 @@ class PqcAppletTest {
         int total = 0;
 
         ResponseAPDU response = simulator.transmitCommand(
-                new CommandAPDU(CLA, PqcApplet.INS_GET_PUBKEY, 0x00, 0x00, 256));
+            new CommandAPDU(CLA, PqcApplet.INS_GET_PUBKEY, 0x00, 0x00, 256)
+        );
         byte[] chunk = response.getData();
         System.arraycopy(chunk, 0, accumulated, total, chunk.length);
         total += chunk.length;
 
         while ((response.getSW() & 0xFF00) == 0x6100) {
             response = simulator.transmitCommand(
-                    new CommandAPDU(CLA, PqcApplet.INS_GET_RESPONSE, 0x00, 0x00, 256));
+                new CommandAPDU(
+                    CLA,
+                    PqcApplet.INS_GET_RESPONSE,
+                    0x00,
+                    0x00,
+                    256
+                )
+            );
             chunk = response.getData();
             System.arraycopy(chunk, 0, accumulated, total, chunk.length);
             total += chunk.length;
@@ -121,7 +158,14 @@ class PqcAppletTest {
         total += chunk.length;
         while ((response.getSW() & 0xFF00) == 0x6100) {
             response = simulator.transmitCommand(
-                    new CommandAPDU(CLA, PqcApplet.INS_GET_RESPONSE, 0x00, 0x00, 256));
+                new CommandAPDU(
+                    CLA,
+                    PqcApplet.INS_GET_RESPONSE,
+                    0x00,
+                    0x00,
+                    256
+                )
+            );
             chunk = response.getData();
             System.arraycopy(chunk, 0, buf, total, chunk.length);
             total += chunk.length;
@@ -135,8 +179,16 @@ class PqcAppletTest {
     @Test
     void signWithWrongLengthShouldReturn6700() {
         byte[] shortDigest = new byte[16];
-        CommandAPDU sign = new CommandAPDU(CLA, PqcApplet.INS_SIGN, 0x00, 0x00, shortDigest, 0, shortDigest.length,
-                256);
+        CommandAPDU sign = new CommandAPDU(
+            CLA,
+            PqcApplet.INS_SIGN,
+            0x00,
+            0x00,
+            shortDigest,
+            0,
+            shortDigest.length,
+            256
+        );
         ResponseAPDU response = simulator.transmitCommand(sign);
         assertEquals(0x6700, response.getSW());
     }
@@ -145,7 +197,17 @@ class PqcAppletTest {
     void signShouldReturnSignatureOf2420Bytes() {
         byte[] digest = new byte[32];
         ResponseAPDU first = simulator.transmitCommand(
-                new CommandAPDU(CLA, PqcApplet.INS_SIGN, 0x00, 0x00, digest, 0, digest.length, 256));
+            new CommandAPDU(
+                CLA,
+                PqcApplet.INS_SIGN,
+                0x00,
+                0x00,
+                digest,
+                0,
+                digest.length,
+                256
+            )
+        );
         byte[] signature = collectChunked(first, 2420);
         assertEquals(2420, signature.length);
     }
@@ -153,20 +215,39 @@ class PqcAppletTest {
     @Test
     void signatureShouldVerifyAgainstPubKey() throws Exception {
         byte[] pubKeyBytes = collectChunked(
-                simulator.transmitCommand(new CommandAPDU(CLA, PqcApplet.INS_GET_PUBKEY, 0x00, 0x00, 256)),
-                1312);
+            simulator.transmitCommand(
+                new CommandAPDU(CLA, PqcApplet.INS_GET_PUBKEY, 0x00, 0x00, 256)
+            ),
+            1312
+        );
 
         byte[] digest = hexToBytes(ABC_SHA3_256_OUTPUT);
         byte[] signature = collectChunked(
-                simulator.transmitCommand(
-                        new CommandAPDU(CLA, PqcApplet.INS_SIGN, 0x00, 0x00, digest, 0, digest.length, 256)),
-                2420);
+            simulator.transmitCommand(
+                new CommandAPDU(
+                    CLA,
+                    PqcApplet.INS_SIGN,
+                    0x00,
+                    0x00,
+                    digest,
+                    0,
+                    digest.length,
+                    256
+                )
+            ),
+            2420
+        );
 
         MLDSAPublicKeyParameters pubKeyParams = new MLDSAPublicKeyParameters(
-                MLDSAParameters.ml_dsa_44, pubKeyBytes);
+            MLDSAParameters.ml_dsa_44,
+            pubKeyBytes
+        );
         MLDSASigner verifier = new MLDSASigner();
         verifier.init(false, pubKeyParams);
         verifier.update(digest, 0, digest.length);
-        assertTrue(verifier.verifySignature(signature), "Signature must verify against public key");
+        assertTrue(
+            verifier.verifySignature(signature),
+            "Signature must verify against public key"
+        );
     }
 }
